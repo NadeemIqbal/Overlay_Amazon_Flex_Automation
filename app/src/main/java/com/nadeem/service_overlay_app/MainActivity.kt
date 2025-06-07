@@ -9,97 +9,85 @@ import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.nadeem.service_overlay_app.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var accessibilityStatus: TextView
-    private lateinit var overlayStatus: TextView
-    private lateinit var instructions: TextView
-    private lateinit var enableAccessibilityButton: Button
+    private lateinit var binding: ActivityMainBinding
+    
+    companion object {
+        private const val TAG = "MainActivity"
+        private const val DARK_THEME_COLOR = "#1F1F1F"
+        private const val LIGHT_THEME_COLOR = "#FFFFFF"
+    }
 
     private val overlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        Log.e("MainActivity", "Overlay permission result received")
+        Log.d(TAG, "Overlay permission result received")
         updateStatus()
         if (Settings.canDrawOverlays(this)) {
-            Log.e("MainActivity", "Overlay permission granted")
+            Log.d(TAG, "Overlay permission granted")
             checkAccessibilityPermission()
         } else {
-            Log.e("MainActivity", "Overlay permission denied")
-            Toast.makeText(this, "Overlay permission is required", Toast.LENGTH_LONG).show()
+            Log.d(TAG, "Overlay permission denied")
+            showToast("Overlay permission is required")
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        Log.e("MainActivity", "onCreate called")
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        Log.d(TAG, "onCreate called")
 
-        // Configure system UI
+        setupSystemUI()
+        initializeViews()
+        checkPermissions()
+    }
+
+    private fun setupSystemUI() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         
-        // Get the current theme mode
         val isDarkMode = AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES
-        
-        // Set status bar and navigation bar colors based on theme
-        if (isDarkMode) {
-            // Use a slightly lighter dark color for better visibility
-            window.statusBarColor = Color.parseColor("#1F1F1F")
-            window.navigationBarColor = Color.parseColor("#1F1F1F")
-            
-            // Ensure system UI elements are visible in dark mode
-            window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        configureSystemUI(isDarkMode)
+    }
+
+    private fun configureSystemUI(isDarkMode: Boolean) {
+        val backgroundColor = if (isDarkMode) DARK_THEME_COLOR else LIGHT_THEME_COLOR
+        window.apply {
+            statusBarColor = Color.parseColor(backgroundColor)
+            navigationBarColor = Color.parseColor(backgroundColor)
+            decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                     or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
-            
-            // Use light icons for dark theme
-            WindowInsetsControllerCompat(window, window.decorView).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = false
-            }
-        } else {
-            window.statusBarColor = Color.parseColor("#FFFFFF")
-            window.navigationBarColor = Color.parseColor("#FFFFFF")
-            
-            // Ensure system UI elements are visible in light mode
-            window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
-            
-            // Use dark icons for light theme
-            WindowInsetsControllerCompat(window, window.decorView).apply {
-                isAppearanceLightStatusBars = true
-                isAppearanceLightNavigationBars = true
-            }
         }
 
-        // Initialize views
-        accessibilityStatus = findViewById(R.id.accessibilityStatus)
-        overlayStatus = findViewById(R.id.overlayStatus)
-        instructions = findViewById(R.id.instructions)
-        enableAccessibilityButton = findViewById(R.id.enableAccessibilityButton)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isDarkMode
+            isAppearanceLightNavigationBars = !isDarkMode
+        }
+    }
 
-        // Set up button click listener
-        enableAccessibilityButton.setOnClickListener {
+    private fun initializeViews() {
+        binding.enableAccessibilityButton.setOnClickListener {
             requestAccessibilityPermission()
         }
+    }
 
+    private fun checkPermissions() {
         updateStatus()
-
         if (Settings.canDrawOverlays(this)) {
-            Log.e("MainActivity", "Overlay permission already granted")
+            Log.d(TAG, "Overlay permission already granted")
             checkAccessibilityPermission()
         } else {
-            Log.e("MainActivity", "Requesting overlay permission")
+            Log.d(TAG, "Requesting overlay permission")
             requestOverlayPermission()
         }
     }
@@ -108,27 +96,29 @@ class MainActivity : AppCompatActivity() {
         val overlayEnabled = Settings.canDrawOverlays(this)
         val accessibilityEnabled = isAccessibilityServiceEnabled()
 
-        // Update status texts
-        accessibilityStatus.text = "Accessibility Service: ${if (accessibilityEnabled) "Enabled" else "Disabled"}"
-        overlayStatus.text = "Overlay Permission: ${if (overlayEnabled) "Granted" else "Not Granted"}"
+        binding.apply {
+            accessibilityStatus.text = getString(R.string.accessibility_status_format, 
+                if (accessibilityEnabled) "Enabled" else "Disabled")
+            overlayStatus.text = getString(R.string.overlay_status_format,
+                if (overlayEnabled) "Granted" else "Not Granted")
+            enableAccessibilityButton.visibility = if (accessibilityEnabled) View.GONE else View.VISIBLE
+            instructions.text = buildInstructionsText(overlayEnabled, accessibilityEnabled)
+        }
+    }
 
-        // Update button visibility
-        enableAccessibilityButton.visibility = if (accessibilityEnabled) View.GONE else View.VISIBLE
-
-        // Update instructions
-        val instructionsText = buildString {
-            append("To enable the service:\n\n")
+    private fun buildInstructionsText(overlayEnabled: Boolean, accessibilityEnabled: Boolean): String {
+        return buildString {
+            append(getString(R.string.instructions_header))
             if (!overlayEnabled) {
-                append("1. Grant overlay permission by clicking the button below\n")
+                append(getString(R.string.overlay_instruction))
             }
             if (!accessibilityEnabled) {
-                append("2. Click the 'Enable Accessibility Service' button above\n")
+                append(getString(R.string.accessibility_instruction))
             }
             if (overlayEnabled && accessibilityEnabled) {
-                append("All permissions are granted. The service should be running.")
+                append(getString(R.string.all_permissions_granted))
             }
         }
-        instructions.text = instructionsText
     }
 
     private fun requestOverlayPermission() {
@@ -140,13 +130,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAccessibilityPermission() {
-        Log.e("MainActivity", "Checking accessibility permission")
-        val accessibilityEnabled = isAccessibilityServiceEnabled()
-        if (accessibilityEnabled) {
-            Log.e("MainActivity", "Accessibility service enabled, starting overlay service")
+        Log.d(TAG, "Checking accessibility permission")
+        if (isAccessibilityServiceEnabled()) {
+            Log.d(TAG, "Accessibility service enabled, starting overlay service")
             startOverlayService()
         } else {
-            Log.e("MainActivity", "Accessibility service not enabled, requesting permission")
+            Log.d(TAG, "Accessibility service not enabled, requesting permission")
             requestAccessibilityPermission()
         }
     }
@@ -167,23 +156,19 @@ class MainActivity : AppCompatActivity() {
                 contentResolver,
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
             )
-            Log.e("MainActivity", "Accessibility service string: $settingValue")
+            Log.d(TAG, "Accessibility service string: $settingValue")
             return settingValue?.contains(service) == true
         }
         return false
     }
 
     private fun requestAccessibilityPermission() {
-        Toast.makeText(
-            this,
-            "Please enable accessibility service for this app",
-            Toast.LENGTH_LONG
-        ).show()
+        showToast(getString(R.string.enable_accessibility_message))
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
     private fun startOverlayService() {
-        Log.e("MainActivity", "Starting overlay service")
+        Log.d(TAG, "Starting overlay service")
         try {
             val serviceIntent = Intent(this, OverlayService::class.java).apply {
                 putExtra("foregroundServiceType", ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -193,20 +178,23 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startService(serviceIntent)
             }
-            Log.e("MainActivity", "Overlay service started successfully")
+            Log.d(TAG, "Overlay service started successfully")
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error starting overlay service", e)
-            Toast.makeText(this, "Error starting service: ${e.message}", Toast.LENGTH_LONG).show()
+            Log.e(TAG, "Error starting overlay service", e)
+            showToast(getString(R.string.error_starting_service, e.message))
         }
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     override fun onResume() {
         super.onResume()
-        Log.e("MainActivity", "onResume called")
+        Log.d(TAG, "onResume called")
         updateStatus()
-        // Check if we need to start the service when returning from settings
         if (Settings.canDrawOverlays(this) && isAccessibilityServiceEnabled()) {
-            Log.e("MainActivity", "Permissions granted, starting service in onResume")
+            Log.d(TAG, "Permissions granted, starting service in onResume")
             startOverlayService()
         }
     }
