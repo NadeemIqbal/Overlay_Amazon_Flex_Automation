@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Service Overlay App</string>
-    <string name="accessibility_service_description">This service helps automate screen interactions for educational purposes.</string>
+    <string name="accessibility_service_description">Service to handle overlay functionality</string>
+    
+    <!-- MainActivity Strings -->
+    <string name="status_title">Service Status</string>
+    <string name="enable_accessibility_button">Enable Accessibility Service</string>
+    <string name="instructions_title">Instructions</string>
+    <string name="accessibility_status_format">Accessibility Service: %1$s</string>
+    <string name="overlay_status_format">Overlay Permission: %1$s</string>
+    <string name="instructions_header">To enable the service:\n\n</string>
+    <string name="overlay_instruction">1. Grant overlay permission by clicking the button below\n</string>
+    <string name="accessibility_instruction">2. Click the \'Enable Accessibility Service\' button above\n</string>
+    <string name="all_permissions_granted">All permissions are granted. The service should be running.</string>
+    <string name="enable_accessibility_message">Please enable accessibility service for this app</string>
+    <string name="error_starting_service">Error starting service: %1$s</string>
 </resources>

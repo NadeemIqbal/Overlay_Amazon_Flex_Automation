@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -40,6 +41,10 @@ class OverlayService : Service() {
                         isClickingAccept -> {
                             handler.postDelayed(this, 500)
                         }
+                        accessibilityService.hasRefreshButton() ->{
+                            accessibilityService.tryClickRefreshButton()
+                            handler.postDelayed(this, 500)
+                        }
                         // If there are jobs, click the first one and then accept
                         accessibilityService.hasJobsNow() -> {
                             val jobClicked = accessibilityService.tryClickFirstJob()
@@ -47,12 +52,13 @@ class OverlayService : Service() {
                                 // Wait a bit for the job details to load
                                 handler.postDelayed({
                                     accessibilityService.tryClickAcceptButton()
-                                }, 1000)
+                                }, 100)
                             }
                             handler.postDelayed(this, 500)
                         }
                         // If no jobs, click refresh
                         else -> {
+                            Log.e("TAG","Ignore")
                             accessibilityService.tryClickRefreshButton()
                             handler.postDelayed(this, 500)
                         }
