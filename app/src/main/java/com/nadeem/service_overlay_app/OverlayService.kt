@@ -40,30 +40,13 @@ class OverlayService : Service() {
                         isClickingAccept -> {
                             handler.postDelayed(this, 500)
                         }
-                        // If there are jobs, click the first one
-                        accessibilityService.hasJobs() -> {
-                            val jobBounds = accessibilityService.getFirstJobBounds()
-                            if (jobBounds != null) {
-                                isClickingJob = true
-                                accessibilityService.performClick(
-                                    jobBounds.centerX(),
-                                    jobBounds.centerY()
-                                )
+                        // If there are jobs, click the first one and then accept
+                        accessibilityService.hasJobsNow() -> {
+                            val jobClicked = accessibilityService.tryClickFirstJob()
+                            if (jobClicked) {
                                 // Wait a bit for the job details to load
                                 handler.postDelayed({
-                                    isClickingJob = false
-                                    // Try to click accept button
-                                    val acceptBounds = accessibilityService.getAcceptButtonBounds()
-                                    if (acceptBounds != null) {
-                                        isClickingAccept = true
-                                        accessibilityService.performClick(
-                                            acceptBounds.centerX(),
-                                            acceptBounds.centerY()
-                                        )
-                                        handler.postDelayed({
-                                            isClickingAccept = false
-                                        }, 1000)
-                                    }
+                                    accessibilityService.tryClickAcceptButton()
                                 }, 1000)
                             }
                             handler.postDelayed(this, 500)
