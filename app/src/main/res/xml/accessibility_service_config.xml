@@ -7,5 +7,5 @@
     android:notificationTimeout="100"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="true"
-    android:packageNames="com.android.settings"
+    android:packageNames="com.android.settings,com.nadeem.service_overlay_app"
     android:settingsActivity="com.nadeem.service_overlay_app.MainActivity"/> 
