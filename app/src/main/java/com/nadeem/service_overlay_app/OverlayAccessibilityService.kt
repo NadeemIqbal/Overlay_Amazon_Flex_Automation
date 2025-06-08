@@ -89,13 +89,14 @@ class OverlayAccessibilityService : AccessibilityService() {
         isWaitingForJobClick = true
         android.os.Handler(mainLooper).postDelayed({
             isWaitingForJobClick = false
-            // Click at 75% width and custom height percentage (default 95%)
-            val bottomRightX = (screenWidth * 0.75).toInt()
+            // Click at custom width percentage and custom height percentage
+            val widthPercentage = MainActivity.getWidthPercentage(applicationContext) / 100f
             val heightPercentage = MainActivity.getHeightPercentage(applicationContext) / 100f
+            val bottomRightX = (screenWidth * widthPercentage).toInt()
             val bottomRightY = (screenHeight * heightPercentage).toInt()
             Log.e(
                 TAG,
-                "Clicking at bottom right coordinates: x=$bottomRightX, y=$bottomRightY (${heightPercentage * 100}% height)"
+                "Clicking at bottom right coordinates: x=$bottomRightX, y=$bottomRightY (${widthPercentage * 100}% width, ${heightPercentage * 100}% height)"
             )
             performClick(bottomRightX, bottomRightY)
         }, 1000)

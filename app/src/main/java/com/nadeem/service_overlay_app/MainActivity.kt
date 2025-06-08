@@ -80,11 +80,25 @@ class MainActivity : AppCompatActivity() {
         val savedHeightPercentage = prefs.getFloat(KEY_HEIGHT_PERCENTAGE, 93f)
         binding.heightPercentageInput.setText(savedHeightPercentage.toString())
 
+        // Initialize width percentage from preferences
+        val savedWidthPercentage = prefs.getFloat(KEY_WIDTH_PERCENTAGE, 75f)
+        binding.widthPercentageInput.setText(savedWidthPercentage.toString())
+
         binding.saveHeightButton.setOnClickListener {
             val heightPercentage = binding.heightPercentageInput.text.toString().toFloatOrNull()
             if (heightPercentage != null && heightPercentage in 0f..100f) {
                 prefs.edit().putFloat(KEY_HEIGHT_PERCENTAGE, heightPercentage).apply()
                 showToast("Height percentage saved: $heightPercentage%")
+            } else {
+                showToast("Please enter a valid percentage between 0 and 100")
+            }
+        }
+
+        binding.saveWidthButton.setOnClickListener {
+            val widthPercentage = binding.widthPercentageInput.text.toString().toFloatOrNull()
+            if (widthPercentage != null && widthPercentage in 0f..100f) {
+                prefs.edit().putFloat(KEY_WIDTH_PERCENTAGE, widthPercentage).apply()
+                showToast("Width percentage saved: $widthPercentage%")
             } else {
                 showToast("Please enter a valid percentage between 0 and 100")
             }
@@ -223,10 +237,16 @@ class MainActivity : AppCompatActivity() {
             return prefs.getFloat(KEY_HEIGHT_PERCENTAGE, 95f)
         }
 
+        fun getWidthPercentage(context: Context): Float {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getFloat(KEY_WIDTH_PERCENTAGE, 75f)
+        }
+
         private const val TAG = "MainActivity"
         private const val DARK_THEME_COLOR = "#1F1F1F"
         private const val LIGHT_THEME_COLOR = "#FFFFFF"
         private const val PREFS_NAME = "OverlaySettings"
         private const val KEY_HEIGHT_PERCENTAGE = "height_percentage"
+        private const val KEY_WIDTH_PERCENTAGE = "width_percentage"
     }
 }
