@@ -34,17 +34,17 @@ class OverlayAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString()
-        Log.d(TAG, "Event received: ${event.eventType}, package: $packageName")
+        Log.e(TAG, "Event received: ${event.eventType}, package: $packageName")
 
         // Only process events from our target package
         if (packageName != TARGET_PACKAGE) {
-            Log.d(TAG, "Ignoring event from package: $packageName")
+            Log.e(TAG, "Ignoring event from package: $packageName")
             return
         }
 
         // Process the event only if service is running
         if (!isServiceRunning) {
-            Log.d(TAG, "Service is not running, ignoring event")
+            Log.e(TAG, "Service is not running, ignoring event")
             return
         }
 
@@ -53,7 +53,7 @@ class OverlayAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
                 // Handle window state/content changes
-                Log.d(TAG, "Processing window event from package: $packageName")
+                Log.e(TAG, "Processing window event from package: $packageName")
                 handleJobFlow()
             }
         }
@@ -69,7 +69,7 @@ class OverlayAccessibilityService : AccessibilityService() {
 
         // Check for "No Offers" text in the screen
         if (hasNoOffersText(rootNode)) {
-            Log.d(TAG, "Found 'No Offers' text, performing pull to refresh")
+            Log.e(TAG, "Found 'No Offers' text, performing pull to refresh")
             performPullToRefresh()
             return
         }
@@ -78,21 +78,25 @@ class OverlayAccessibilityService : AccessibilityService() {
         val displayMetrics = resources.displayMetrics
         val screenWidth = displayMetrics.widthPixels
         val screenHeight = displayMetrics.heightPixels
-        
+
         val clickX = screenWidth / 2
         val clickY = (screenHeight * 0.3).toInt()
-        
-        Log.d(TAG, "Clicking at coordinates: x=$clickX, y=$clickY")
+
+        Log.e(TAG, "Clicking at coordinates: x=$clickX, y=$clickY")
         performClick(clickX, clickY)
-        
+
         // Wait 1 second before clicking at bottom right
         isWaitingForJobClick = true
         android.os.Handler(mainLooper).postDelayed({
             isWaitingForJobClick = false
-            // Click at 75% width and 95% height
+            // Click at 75% width and custom height percentage (default 95%)
             val bottomRightX = (screenWidth * 0.75).toInt()
-            val bottomRightY = (screenHeight * 0.95).toInt()
-            Log.d(TAG, "Clicking at bottom right coordinates: x=$bottomRightX, y=$bottomRightY")
+            val heightPercentage = MainActivity.getHeightPercentage(applicationContext) / 100f
+            val bottomRightY = (screenHeight * heightPercentage).toInt()
+            Log.e(
+                TAG,
+                "Clicking at bottom right coordinates: x=$bottomRightX, y=$bottomRightY (${heightPercentage * 100}% height)"
+            )
             performClick(bottomRightX, bottomRightY)
         }, 1000)
     }
@@ -106,11 +110,11 @@ class OverlayAccessibilityService : AccessibilityService() {
 
     private fun clickScheduleButton() {
         val rootNode = rootInActiveWindow ?: return
-        
+
         // Try different variations of the schedule button text
         val scheduleTexts = listOf("Schedule", "SCHEDULE", "schedule")
         val scheduleNodes = mutableListOf<AccessibilityNodeInfo>()
-        
+
         for (text in scheduleTexts) {
             rootNode.findAccessibilityNodeInfosByText(text).forEach { node ->
                 if (!isNavigationDrawer(node)) {
@@ -118,19 +122,19 @@ class OverlayAccessibilityService : AccessibilityService() {
                 }
             }
         }
-        
+
         // Find the rightmost schedule button
         val rightmostNode = scheduleNodes.maxByOrNull { node ->
             val bounds = Rect()
             node.getBoundsInScreen(bounds)
             bounds.right
         }
-        
+
         rightmostNode?.let { node ->
             val bounds = Rect()
             node.getBoundsInScreen(bounds)
-            Log.d(TAG, "Found schedule button: bounds=$bounds")
-            
+            Log.e(TAG, "Found schedule button: bounds=$bounds")
+
             val actionResult = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             if (!actionResult) {
                 performClick(bounds.centerX(), bounds.centerY())
@@ -143,7 +147,7 @@ class OverlayAccessibilityService : AccessibilityService() {
      */
     fun tryClickFirstJob(): Boolean {
         val rootNode = rootInActiveWindow ?: run {
-            Log.d(TAG, "rootInActiveWindow is null")
+            Log.e(TAG, "rootInActiveWindow is null")
             return false
         }
 
@@ -151,10 +155,10 @@ class OverlayAccessibilityService : AccessibilityService() {
 
         val bounds = Rect()
         jobNode.getBoundsInScreen(bounds)
-        Log.d(TAG, "Found job node: bounds=$bounds")
+        Log.e(TAG, "Found job node: bounds=$bounds")
 
         val actionResult = jobNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        Log.d(TAG, "ACTION_CLICK on job result: $actionResult")
+        Log.e(TAG, "ACTION_CLICK on job result: $actionResult")
 
         if (!actionResult) {
             try {
@@ -163,7 +167,7 @@ class OverlayAccessibilityService : AccessibilityService() {
                 Log.e(TAG, "Error performing click: ${e.message}")
                 e.printStackTrace()
             }
-            Log.d(TAG, "Falling back to gesture click on job at: $bounds")
+            Log.e(TAG, "Falling back to gesture click on job at: $bounds")
         }
         return true
     }
@@ -173,14 +177,14 @@ class OverlayAccessibilityService : AccessibilityService() {
      */
     fun tryClickAcceptButton(): Boolean {
         val rootNode = rootInActiveWindow ?: run {
-            Log.d(TAG, "rootInActiveWindow is null")
+            Log.e(TAG, "rootInActiveWindow is null")
             return false
         }
         val acceptNode = findAcceptButton(rootNode) ?: return false
 
         val bounds = Rect()
         acceptNode.getBoundsInScreen(bounds)
-        Log.d(TAG, "Accept button found: bounds=$bounds")
+        Log.e(TAG, "Accept button found: bounds=$bounds")
 
         val handler = android.os.Handler(mainLooper)
         handler.post {
@@ -188,7 +192,7 @@ class OverlayAccessibilityService : AccessibilityService() {
         }
 
         val actionResult = acceptNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        Log.d(TAG, "ACTION_CLICK on accept result: $actionResult")
+        Log.e(TAG, "ACTION_CLICK on accept result: $actionResult")
 
         if (!actionResult) {
             performClick(bounds.centerX(), bounds.centerY())
@@ -196,7 +200,7 @@ class OverlayAccessibilityService : AccessibilityService() {
             handler.post {
                 Toast.makeText(applicationContext, "Accept Clicked 2", Toast.LENGTH_SHORT).show()
             }
-            Log.d(TAG, "Falling back to gesture click on accept at: $bounds")
+            Log.e(TAG, "Falling back to gesture click on accept at: $bounds")
         }
         return true
     }
@@ -236,7 +240,27 @@ class OverlayAccessibilityService : AccessibilityService() {
 
         // Define the target text patterns
         //val targetPatterns = listOf("DBI2", "DBI3", "DBI4", "DBI5", "DOX2", "DWR1")
-        val targetPatterns = listOf("DBI2", "CUK3", "DBI3", "DBI4", "VAP4", "DBI5", "CU46", "CU49", "CC16", "CU03", "DWR1", "DB84", "DBI7", "CU63", "DOX2", "CU74", "DST1", "CU30", "DXB1")
+        val targetPatterns = listOf(
+            "DBI2",
+            "CUK3",
+            "DBI3",
+            "DBI4",
+            "VAP4",
+            "DBI5",
+            "CU46",
+            "CU49",
+            "CC16",
+            "CU03",
+            "DWR1",
+            "DB84",
+            "DBI7",
+            "CU63",
+            "DOX2",
+            "CU74",
+            "DST1",
+            "CU30",
+            "DXB1"
+        )
 
         fun findJobNodes(node: AccessibilityNodeInfo) {
             try {
@@ -320,17 +344,17 @@ class OverlayAccessibilityService : AccessibilityService() {
                     if (!isNavigationDrawer(node)) {
                         acceptNodes.add(node)
                     } else {
-                        Log.d(TAG, "Skipping navigation drawer node for text: $text")
+                        Log.e(TAG, "Skipping navigation drawer node for text: $text")
                     }
                 }
             }
 
-            Log.d(TAG, "Found ${acceptNodes.size} nodes with accept-like text")
+            Log.e(TAG, "Found ${acceptNodes.size} nodes with accept-like text")
 
             return acceptNodes.firstOrNull { node ->
                 val bounds = Rect()
                 node.getBoundsInScreen(bounds)
-                Log.d(
+                Log.e(
                     TAG, "Checking accept node: text=${node.text}, " +
                             "desc=${node.contentDescription}, " +
                             "clickable=${node.isClickable}, " +
@@ -349,7 +373,7 @@ class OverlayAccessibilityService : AccessibilityService() {
 
     fun tryClickRefreshButton(): Boolean {
         val rootNode = rootInActiveWindow ?: run {
-            Log.d(TAG, "rootInActiveWindow is null")
+            Log.e(TAG, "rootInActiveWindow is null")
             return false
         }
 
@@ -358,17 +382,17 @@ class OverlayAccessibilityService : AccessibilityService() {
         if (button != null) {
             val bounds = Rect()
             button.getBoundsInScreen(bounds)
-            Log.d(TAG, "Refresh button found: bounds=$bounds")
+            Log.e(TAG, "Refresh button found: bounds=$bounds")
 
             val actionResult = button.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            Log.d(TAG, "ACTION_CLICK result: $actionResult")
+            Log.e(TAG, "ACTION_CLICK result: $actionResult")
 
             if (!actionResult) {
                 performClick(bounds.centerX(), bounds.centerY())
-                Log.d(TAG, "Falling back to gesture click at: $bounds")
+                Log.e(TAG, "Falling back to gesture click at: $bounds")
             }
         } else {
-            Log.d(TAG, "No refresh button found, trying pull-to-refresh")
+            Log.e(TAG, "No refresh button found, trying pull-to-refresh")
             performPullToRefresh()
         }
 
@@ -385,7 +409,7 @@ class OverlayAccessibilityService : AccessibilityService() {
         val startY = screenHeight * 0.31f  // Start at 30% from top
         val endY = screenHeight * 0.7f    // End at 70% from top
 
-        Log.d(TAG, "Performing pull-to-refresh gesture: startY=$startY, endY=$endY")
+        Log.e(TAG, "Performing pull-to-refresh gesture: startY=$startY, endY=$endY")
 
         // Create the path for the gesture
         val path = Path()
@@ -403,12 +427,12 @@ class OverlayAccessibilityService : AccessibilityService() {
         ) // 500ms duration
         dispatchGesture(gestureBuilder.build(), object : GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription) {
-                Log.d(TAG, "Pull-to-refresh gesture completed")
+                Log.e(TAG, "Pull-to-refresh gesture completed")
                 showToast("Pull-to-refresh gesture completed")
             }
 
             override fun onCancelled(gestureDescription: GestureDescription) {
-                Log.d(TAG, "Pull-to-refresh gesture cancelled")
+                Log.e(TAG, "Pull-to-refresh gesture cancelled")
                 showToast("Pull-to-refresh gesture cancelled")
             }
         }, null)
@@ -430,17 +454,17 @@ class OverlayAccessibilityService : AccessibilityService() {
                     if (!isNavigationDrawer(node)) {
                         refreshNodes.add(node)
                     } else {
-                        Log.d(TAG, "Skipping navigation drawer node for text: $text")
+                        Log.e(TAG, "Skipping navigation drawer node for text: $text")
                     }
                 }
             }
 
-            Log.d(TAG, "Found ${refreshNodes.size} nodes with refresh-like text")
+            Log.e(TAG, "Found ${refreshNodes.size} nodes with refresh-like text")
 
             return refreshNodes.firstOrNull { node ->
                 val bounds = Rect()
                 node.getBoundsInScreen(bounds)
-                Log.d(
+                Log.e(
                     TAG, "Checking refresh node: text=${node.text}, " +
                             "desc=${node.contentDescription}, " +
                             "clickable=${node.isClickable}, " +
@@ -458,7 +482,7 @@ class OverlayAccessibilityService : AccessibilityService() {
     }
 
     fun performClick(x: Int, y: Int) {
-        Log.d(TAG, "Performing gesture click at: x=$x, y=$y")
+        Log.e(TAG, "Performing gesture click at: x=$x, y=$y")
         val path = Path()
         path.moveTo(x.toFloat(), y.toFloat())
         val gestureBuilder = GestureDescription.Builder()
@@ -479,19 +503,19 @@ class OverlayAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        Log.d(TAG, "Service interrupted")
+        Log.e(TAG, "Service interrupted")
         isServiceRunning = false
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Log.d(TAG, "Service connected")
+        Log.e(TAG, "Service connected")
         setInstance(this)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "Service destroyed")
+        Log.e(TAG, "Service destroyed")
         setInstance(null)
         isServiceRunning = false
     }

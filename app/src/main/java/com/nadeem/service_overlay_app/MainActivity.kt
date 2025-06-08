@@ -1,5 +1,6 @@
 package com.nadeem.service_overlay_app
 
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Color
@@ -19,23 +20,17 @@ import com.nadeem.service_overlay_app.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
-    
-    companion object {
-        private const val TAG = "MainActivity"
-        private const val DARK_THEME_COLOR = "#1F1F1F"
-        private const val LIGHT_THEME_COLOR = "#FFFFFF"
-    }
 
     private val overlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        Log.d(TAG, "Overlay permission result received")
+        Log.e(TAG, "Overlay permission result received")
         updateStatus()
         if (Settings.canDrawOverlays(this)) {
-            Log.d(TAG, "Overlay permission granted")
+            Log.e(TAG, "Overlay permission granted")
             checkAccessibilityPermission()
         } else {
-            Log.d(TAG, "Overlay permission denied")
+            Log.e(TAG, "Overlay permission denied")
             showToast("Overlay permission is required")
         }
     }
@@ -44,7 +39,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        Log.d(TAG, "onCreate called")
+        Log.e(TAG, "onCreate called")
 
         setupSystemUI()
         initializeViews()
@@ -54,7 +49,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupSystemUI() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-        
+
         val isDarkMode = AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES
         configureSystemUI(isDarkMode)
     }
@@ -79,15 +74,30 @@ class MainActivity : AppCompatActivity() {
         binding.enableAccessibilityButton.setOnClickListener {
             requestAccessibilityPermission()
         }
+
+        // Initialize height percentage from preferences
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val savedHeightPercentage = prefs.getFloat(KEY_HEIGHT_PERCENTAGE, 93f)
+        binding.heightPercentageInput.setText(savedHeightPercentage.toString())
+
+        binding.saveHeightButton.setOnClickListener {
+            val heightPercentage = binding.heightPercentageInput.text.toString().toFloatOrNull()
+            if (heightPercentage != null && heightPercentage in 0f..100f) {
+                prefs.edit().putFloat(KEY_HEIGHT_PERCENTAGE, heightPercentage).apply()
+                showToast("Height percentage saved: $heightPercentage%")
+            } else {
+                showToast("Please enter a valid percentage between 0 and 100")
+            }
+        }
     }
 
     private fun checkPermissions() {
         updateStatus()
         if (Settings.canDrawOverlays(this)) {
-            Log.d(TAG, "Overlay permission already granted")
+            Log.e(TAG, "Overlay permission already granted")
             checkAccessibilityPermission()
         } else {
-            Log.d(TAG, "Requesting overlay permission")
+            Log.e(TAG, "Requesting overlay permission")
             requestOverlayPermission()
         }
     }
@@ -97,16 +107,24 @@ class MainActivity : AppCompatActivity() {
         val accessibilityEnabled = isAccessibilityServiceEnabled()
 
         binding.apply {
-            accessibilityStatus.text = getString(R.string.accessibility_status_format, 
-                if (accessibilityEnabled) "Enabled" else "Disabled")
-            overlayStatus.text = getString(R.string.overlay_status_format,
-                if (overlayEnabled) "Granted" else "Not Granted")
-            enableAccessibilityButton.visibility = if (accessibilityEnabled) View.GONE else View.VISIBLE
+            accessibilityStatus.text = getString(
+                R.string.accessibility_status_format,
+                if (accessibilityEnabled) "Enabled" else "Disabled"
+            )
+            overlayStatus.text = getString(
+                R.string.overlay_status_format,
+                if (overlayEnabled) "Granted" else "Not Granted"
+            )
+            enableAccessibilityButton.visibility =
+                if (accessibilityEnabled) View.GONE else View.VISIBLE
             instructions.text = buildInstructionsText(overlayEnabled, accessibilityEnabled)
         }
     }
 
-    private fun buildInstructionsText(overlayEnabled: Boolean, accessibilityEnabled: Boolean): String {
+    private fun buildInstructionsText(
+        overlayEnabled: Boolean,
+        accessibilityEnabled: Boolean
+    ): String {
         return buildString {
             append(getString(R.string.instructions_header))
             if (!overlayEnabled) {
@@ -130,12 +148,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAccessibilityPermission() {
-        Log.d(TAG, "Checking accessibility permission")
+        Log.e(TAG, "Checking accessibility permission")
         if (isAccessibilityServiceEnabled()) {
-            Log.d(TAG, "Accessibility service enabled, starting overlay service")
+            Log.e(TAG, "Accessibility service enabled, starting overlay service")
             startOverlayService()
         } else {
-            Log.d(TAG, "Accessibility service not enabled, requesting permission")
+            Log.e(TAG, "Accessibility service not enabled, requesting permission")
             requestAccessibilityPermission()
         }
     }
@@ -156,7 +174,7 @@ class MainActivity : AppCompatActivity() {
                 contentResolver,
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
             )
-            Log.d(TAG, "Accessibility service string: $settingValue")
+            Log.e(TAG, "Accessibility service string: $settingValue")
             return settingValue?.contains(service) == true
         }
         return false
@@ -168,7 +186,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startOverlayService() {
-        Log.d(TAG, "Starting overlay service")
+        Log.e(TAG, "Starting overlay service")
         try {
             val serviceIntent = Intent(this, OverlayService::class.java).apply {
                 putExtra("foregroundServiceType", ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -178,7 +196,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startService(serviceIntent)
             }
-            Log.d(TAG, "Overlay service started successfully")
+            Log.e(TAG, "Overlay service started successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error starting overlay service", e)
             showToast(getString(R.string.error_starting_service, e.message))
@@ -191,11 +209,24 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "onResume called")
+        Log.e(TAG, "onResume called")
         updateStatus()
         if (Settings.canDrawOverlays(this) && isAccessibilityServiceEnabled()) {
-            Log.d(TAG, "Permissions granted, starting service in onResume")
+            Log.e(TAG, "Permissions granted, starting service in onResume")
             startOverlayService()
         }
+    }
+
+    companion object {
+        fun getHeightPercentage(context: Context): Float {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getFloat(KEY_HEIGHT_PERCENTAGE, 95f)
+        }
+
+        private const val TAG = "MainActivity"
+        private const val DARK_THEME_COLOR = "#1F1F1F"
+        private const val LIGHT_THEME_COLOR = "#FFFFFF"
+        private const val PREFS_NAME = "OverlaySettings"
+        private const val KEY_HEIGHT_PERCENTAGE = "height_percentage"
     }
 }
