@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content">
+    android:layout_width="64dp"
+    android:layout_height="64dp"
+    android:paddingHorizontal="10dp"
+    android:paddingVertical="50dp">
 
     <ImageButton
         android:id="@+id/toggleButton"
         android:layout_width="48dp"
         android:layout_height="48dp"
+        android:layout_gravity="center"
         android:background="@drawable/circle_background"
-        android:src="@drawable/ic_play"
-        android:contentDescription="Toggle Service" />
+        android:contentDescription="Toggle Service"
+        android:src="@drawable/ic_play" />
 
 </FrameLayout> 

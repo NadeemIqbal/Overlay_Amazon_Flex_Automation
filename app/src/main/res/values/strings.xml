@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Service Overlay App</string>
+    <string name="app_name">Automate Amazon Flex</string>
     <string name="accessibility_service_description">Service to handle overlay functionality</string>
     
     <!-- MainActivity Strings -->
