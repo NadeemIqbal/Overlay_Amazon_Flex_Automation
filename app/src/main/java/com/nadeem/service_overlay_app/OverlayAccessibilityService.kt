@@ -87,7 +87,7 @@ class OverlayAccessibilityService : AccessibilityService() {
 
         // If no job found, try to refresh
         Log.d(TAG, "No job found, attempting refresh")
-        tryClickRefreshButton()
+//        tryClickRefreshButton()
     }
 
     /**
@@ -187,7 +187,8 @@ class OverlayAccessibilityService : AccessibilityService() {
         val bottomThreshold = screenHeight * 0.8 // Bottom 20% of screen
 
         // Define the target text patterns
-        val targetPatterns = listOf("DBI2", "DBI3", "DBI4", "DBI5", "DOX2", "DWR1")
+        //val targetPatterns = listOf("DBI2", "DBI3", "DBI4", "DBI5", "DOX2", "DWR1")
+        val targetPatterns = listOf("DBI2", "CUK3", "DBI3", "DBI4", "VAP4", "DBI5", "CU46", "CU49", "CC16", "CU03", "DWR1", "DB84", "DBI7", "CU63", "DOX2", "CU74", "DST1", "CU30", "DXB1")
 
         fun findJobNodes(node: AccessibilityNodeInfo) {
             try {

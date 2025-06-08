@@ -18,6 +18,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
 import androidx.core.app.NotificationCompat
+import kotlin.random.Random
 
 class OverlayService : Service() {
     private var windowManager: WindowManager? = null
@@ -41,10 +42,10 @@ class OverlayService : Service() {
                         isClickingAccept -> {
                             handler.postDelayed(this, 500)
                         }
-                        accessibilityService.hasRefreshButton() ->{
-                            accessibilityService.tryClickRefreshButton()
-                            handler.postDelayed(this, 500)
-                        }
+//                        accessibilityService.hasRefreshButton() ->{
+//                            accessibilityService.tryClickRefreshButton()
+//                            handler.postDelayed(this, 500)
+//                        }
                         // If there are jobs, click the first one and then accept
                         accessibilityService.hasJobsNow() -> {
                             val jobClicked = accessibilityService.tryClickFirstJob()
@@ -59,8 +60,9 @@ class OverlayService : Service() {
                         // If no jobs, click refresh
                         else -> {
                             Log.e("TAG","Ignore")
-                            accessibilityService.tryClickRefreshButton()
-                            handler.postDelayed(this, 500)
+//                            accessibilityService.tryClickRefreshButton()
+//                            val randomDelay = Random.nextInt(500,1000)
+//                            handler.postDelayed(this, randomDelay.toLong())
                         }
                     }
                 }
