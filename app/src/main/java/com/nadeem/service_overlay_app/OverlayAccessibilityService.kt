@@ -59,7 +59,7 @@ class OverlayAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun handleJobFlow() {
+    public fun handleJobFlow() {
         val rootNode = rootInActiveWindow ?: return
 
         // If we're waiting for job click delay, don't do anything
