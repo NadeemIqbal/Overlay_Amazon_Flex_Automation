@@ -33,38 +33,10 @@ class OverlayService : Service() {
             if (isRunning) {
                 val accessibilityService = OverlayAccessibilityService.getInstance()
                 if (accessibilityService != null) {
-                    when {
-                        // If we're in the middle of clicking a job, wait
-                        isClickingJob -> {
-                            handler.postDelayed(this, 500)
-                        }
-                        // If we're in the middle of clicking accept, wait
-                        isClickingAccept -> {
-                            handler.postDelayed(this, 500)
-                        }
-//                        accessibilityService.hasRefreshButton() ->{
-//                            accessibilityService.tryClickRefreshButton()
-//                            handler.postDelayed(this, 500)
-//                        }
-                        // If there are jobs, click the first one and then accept
-                        accessibilityService.hasJobsNow() -> {
-                            val jobClicked = accessibilityService.tryClickFirstJob()
-                            if (jobClicked) {
-                                // Wait a bit for the job details to load
-                                handler.postDelayed({
-                                    accessibilityService.tryClickAcceptButton()
-                                }, 100)
-                            }
-                            handler.postDelayed(this, 500)
-                        }
-                        // If no jobs, click refresh
-                        else -> {
-                            Log.e("TAG","Ignore")
-//                            accessibilityService.tryClickRefreshButton()
-//                            val randomDelay = Random.nextInt(500,1000)
-//                            handler.postDelayed(this, randomDelay.toLong())
-                        }
-                    }
+                    // Trigger the new workflow in OverlayAccessibilityService
+                    accessibilityService.handleJobFlow()
+                    // Schedule next check after a short delay
+                    handler.postDelayed(this, 500)
                 }
             }
         }

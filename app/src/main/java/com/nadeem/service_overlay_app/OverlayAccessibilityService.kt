@@ -67,27 +67,75 @@ class OverlayAccessibilityService : AccessibilityService() {
             return
         }
 
-        // First check if we can click accept button
-        if (tryClickAcceptButton()) {
-            Log.d(TAG, "Clicked accept button")
+        // Check for "No Offers" text in the screen
+        if (hasNoOffersText(rootNode)) {
+            Log.d(TAG, "Found 'No Offers' text, performing pull to refresh")
+            performPullToRefresh()
             return
         }
 
-        // Then check if we can click a job
-        if (tryClickFirstJob()) {
-            Log.d(TAG, "Clicked first job, waiting 1000ms before next action")
-            isWaitingForJobClick = true
-            android.os.Handler(mainLooper).postDelayed({
-                isWaitingForJobClick = false
-                // Trigger another event to continue the flow
-                onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED))
-            }, 1000)
-            return
-        }
+        // If no "No Offers" text found, click at width/2 and 30% height
+        val displayMetrics = resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+        
+        val clickX = screenWidth / 2
+        val clickY = (screenHeight * 0.3).toInt()
+        
+        Log.d(TAG, "Clicking at coordinates: x=$clickX, y=$clickY")
+        performClick(clickX, clickY)
+        
+        // Wait 1 second before clicking at bottom right
+        isWaitingForJobClick = true
+        android.os.Handler(mainLooper).postDelayed({
+            isWaitingForJobClick = false
+            // Click at 75% width and 95% height
+            val bottomRightX = (screenWidth * 0.75).toInt()
+            val bottomRightY = (screenHeight * 0.95).toInt()
+            Log.d(TAG, "Clicking at bottom right coordinates: x=$bottomRightX, y=$bottomRightY")
+            performClick(bottomRightX, bottomRightY)
+        }, 1000)
+    }
 
-        // If no job found, try to refresh
-        Log.d(TAG, "No job found, attempting refresh")
-//        tryClickRefreshButton()
+    private fun hasNoOffersText(root: AccessibilityNodeInfo): Boolean {
+        val noOffersTexts = listOf("No Offers", "NO OFFERS", "no offers")
+        return noOffersTexts.any { text ->
+            root.findAccessibilityNodeInfosByText(text).isNotEmpty()
+        }
+    }
+
+    private fun clickScheduleButton() {
+        val rootNode = rootInActiveWindow ?: return
+        
+        // Try different variations of the schedule button text
+        val scheduleTexts = listOf("Schedule", "SCHEDULE", "schedule")
+        val scheduleNodes = mutableListOf<AccessibilityNodeInfo>()
+        
+        for (text in scheduleTexts) {
+            rootNode.findAccessibilityNodeInfosByText(text).forEach { node ->
+                if (!isNavigationDrawer(node)) {
+                    scheduleNodes.add(node)
+                }
+            }
+        }
+        
+        // Find the rightmost schedule button
+        val rightmostNode = scheduleNodes.maxByOrNull { node ->
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            bounds.right
+        }
+        
+        rightmostNode?.let { node ->
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            Log.d(TAG, "Found schedule button: bounds=$bounds")
+            
+            val actionResult = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            if (!actionResult) {
+                performClick(bounds.centerX(), bounds.centerY())
+            }
+        }
     }
 
     /**
@@ -334,7 +382,7 @@ class OverlayAccessibilityService : AccessibilityService() {
 
         // Calculate start and end points for the gesture
         val startX = screenWidth / 2f
-        val startY = screenHeight * 0.3f  // Start at 30% from top
+        val startY = screenHeight * 0.31f  // Start at 30% from top
         val endY = screenHeight * 0.7f    // End at 70% from top
 
         Log.d(TAG, "Performing pull-to-refresh gesture: startY=$startY, endY=$endY")
