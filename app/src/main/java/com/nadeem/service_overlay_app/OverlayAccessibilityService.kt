@@ -2,7 +2,6 @@ package com.nadeem.service_overlay_app
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
-import android.content.Context
 import android.graphics.Path
 import android.graphics.Rect
 import android.util.Log
@@ -12,6 +11,7 @@ import android.widget.Toast
 
 class OverlayAccessibilityService : AccessibilityService() {
     private var isServiceRunning = false
+    private var isWaitingForJobClick = false
 
     companion object {
         private const val TAG = "OverlayService"
@@ -34,17 +34,17 @@ class OverlayAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString()
-        Log.d(TAG, "Event received: ${event.eventType}, package: $packageName")
-        
+        Log.e(TAG, "Event received: ${event.eventType}, package: $packageName")
+
         // Only process events from our target package
         if (packageName != TARGET_PACKAGE) {
-            Log.d(TAG, "Ignoring event from package: $packageName")
+            Log.e(TAG, "Ignoring event from package: $packageName")
             return
         }
-        
+
         // Process the event only if service is running
         if (!isServiceRunning) {
-            Log.d(TAG, "Service is not running, ignoring event")
+            Log.e(TAG, "Service is not running, ignoring event")
             return
         }
 
@@ -53,7 +53,92 @@ class OverlayAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
                 // Handle window state/content changes
-                Log.d(TAG, "Processing window event from package: $packageName")
+                Log.e(TAG, "Processing window event from package: $packageName")
+                handleJobFlow()
+            }
+        }
+    }
+
+    public fun handleJobFlow() {
+        val rootNode = rootInActiveWindow ?: return
+
+        // If we're waiting for job click delay, don't do anything
+        if (isWaitingForJobClick) {
+            return
+        }
+
+        // Check for "No Offers" text in the screen
+        if (hasNoOffersText(rootNode)) {
+            Log.e(TAG, "Found 'No Offers' text, performing pull to refresh")
+            performPullToRefresh()
+            return
+        }
+
+        // If no "No Offers" text found, click at width/2 and 30% height
+        val displayMetrics = resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
+        val clickX = screenWidth / 2
+        val clickY = (screenHeight * 0.3).toInt()
+
+        Log.e(TAG, "Clicking at coordinates: x=$clickX, y=$clickY")
+        performClick(clickX, clickY)
+
+        // Wait 1 second before clicking at bottom right
+        isWaitingForJobClick = true
+        android.os.Handler(mainLooper).postDelayed({
+            isWaitingForJobClick = false
+            // Click at custom width percentage and custom height percentage
+            val widthPercentage = MainActivity.getWidthPercentage(applicationContext) / 100f
+            val heightPercentage = MainActivity.getHeightPercentage(applicationContext) / 100f
+            val bottomRightX = (screenWidth * widthPercentage).toInt()
+            val bottomRightY = (screenHeight * heightPercentage).toInt()
+            Log.e(
+                TAG,
+                "Clicking at bottom right coordinates: x=$bottomRightX, y=$bottomRightY (${widthPercentage * 100}% width, ${heightPercentage * 100}% height)"
+            )
+            performClick(bottomRightX, bottomRightY)
+        }, 1000)
+    }
+
+    private fun hasNoOffersText(root: AccessibilityNodeInfo): Boolean {
+        val noOffersTexts = listOf("No Offers", "NO OFFERS", "no offers")
+        return noOffersTexts.any { text ->
+            root.findAccessibilityNodeInfosByText(text).isNotEmpty()
+        }
+    }
+
+    private fun clickScheduleButton() {
+        val rootNode = rootInActiveWindow ?: return
+
+        // Try different variations of the schedule button text
+        val scheduleTexts = listOf("Schedule", "SCHEDULE", "schedule")
+        val scheduleNodes = mutableListOf<AccessibilityNodeInfo>()
+
+        for (text in scheduleTexts) {
+            rootNode.findAccessibilityNodeInfosByText(text).forEach { node ->
+                if (!isNavigationDrawer(node)) {
+                    scheduleNodes.add(node)
+                }
+            }
+        }
+
+        // Find the rightmost schedule button
+        val rightmostNode = scheduleNodes.maxByOrNull { node ->
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            bounds.right
+        }
+
+        rightmostNode?.let { node ->
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            Log.e(TAG, "Found schedule button: bounds=$bounds")
+
+            val actionResult = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            if (!actionResult) {
+                performClick(bounds.centerX(), bounds.centerY())
             }
         }
     }
@@ -63,29 +148,19 @@ class OverlayAccessibilityService : AccessibilityService() {
      */
     fun tryClickFirstJob(): Boolean {
         val rootNode = rootInActiveWindow ?: run {
-            Log.d(TAG, "rootInActiveWindow is null")
+            Log.e(TAG, "rootInActiveWindow is null")
             return false
         }
-        
-        Log.d(TAG, "Attempting to click first job")
-        val jobNode = findFirstJobNode(rootNode)
-        
-        if (jobNode == null) {
-            Log.d(TAG, "No job node found")
-            return false
-        }
-        
+
+        val jobNode = findFirstJobNode(rootNode) ?: return false
+
         val bounds = Rect()
         jobNode.getBoundsInScreen(bounds)
-        Log.d(TAG, "Found job node: " +
-            "text=${jobNode.text}, " +
-            "desc=${jobNode.contentDescription}, " +
-            "bounds=$bounds")
-        
+        Log.e(TAG, "Found job node: bounds=$bounds")
+
         val actionResult = jobNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        Log.d(TAG, "ACTION_CLICK on job result: $actionResult")
-        showToast("Clicked first job via accessibility service")
-        
+        Log.e(TAG, "ACTION_CLICK on job result: $actionResult")
+
         if (!actionResult) {
             try {
                 performClick(bounds.centerX(), bounds.centerY())
@@ -93,7 +168,7 @@ class OverlayAccessibilityService : AccessibilityService() {
                 Log.e(TAG, "Error performing click: ${e.message}")
                 e.printStackTrace()
             }
-            Log.d(TAG, "Falling back to gesture click on job at: $bounds")
+            Log.e(TAG, "Falling back to gesture click on job at: $bounds")
         }
         return true
     }
@@ -103,29 +178,30 @@ class OverlayAccessibilityService : AccessibilityService() {
      */
     fun tryClickAcceptButton(): Boolean {
         val rootNode = rootInActiveWindow ?: run {
-            Log.d(TAG, "rootInActiveWindow is null")
+            Log.e(TAG, "rootInActiveWindow is null")
             return false
         }
-        val acceptNode = findAcceptButton(rootNode)
-        if (acceptNode == null) {
-            Log.d(TAG, "No accept button found")
-            return false
-        }
+        val acceptNode = findAcceptButton(rootNode) ?: return false
+
         val bounds = Rect()
         acceptNode.getBoundsInScreen(bounds)
-        Log.d(TAG, "Accept button: text=${acceptNode.text}, " +
-            "clickable=${acceptNode.isClickable}, " +
-            "enabled=${acceptNode.isEnabled}, " +
-            "visible=${acceptNode.isVisibleToUser}, " +
-            "bounds=$bounds")
-        
+        Log.e(TAG, "Accept button found: bounds=$bounds")
+
+        val handler = android.os.Handler(mainLooper)
+        handler.post {
+            Toast.makeText(applicationContext, "Accept Clicked 1", Toast.LENGTH_SHORT).show()
+        }
+
         val actionResult = acceptNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        Log.d(TAG, "ACTION_CLICK on accept result: $actionResult")
-        showToast("Clicked accept via accessibility service")
-        
+        Log.e(TAG, "ACTION_CLICK on accept result: $actionResult")
+
         if (!actionResult) {
             performClick(bounds.centerX(), bounds.centerY())
-            Log.d(TAG, "Falling back to gesture click on accept at: $bounds")
+            val handler = android.os.Handler(mainLooper)
+            handler.post {
+                Toast.makeText(applicationContext, "Accept Clicked 2", Toast.LENGTH_SHORT).show()
+            }
+            Log.e(TAG, "Falling back to gesture click on accept at: $bounds")
         }
         return true
     }
@@ -151,8 +227,8 @@ class OverlayAccessibilityService : AccessibilityService() {
      */
     private fun isNavigationDrawer(node: AccessibilityNodeInfo): Boolean {
         val className = node.className?.toString() ?: return false
-        return NAVIGATION_DRAWER_CLASSES.any { drawerClass -> 
-            className.contains(drawerClass, ignoreCase = true) 
+        return NAVIGATION_DRAWER_CLASSES.any { drawerClass ->
+            className.contains(drawerClass, ignoreCase = true)
         }
     }
 
@@ -160,104 +236,92 @@ class OverlayAccessibilityService : AccessibilityService() {
         val jobs = mutableListOf<AccessibilityNodeInfo>()
         val displayMetrics = resources.displayMetrics
         val screenHeight = displayMetrics.heightPixels
-        val topThreshold = screenHeight * 0.1 // Top 25% of screen
+        val topThreshold = screenHeight * 0.1 // Top 10% of screen
         val bottomThreshold = screenHeight * 0.8 // Bottom 20% of screen
-        
+
         // Define the target text patterns
-        val targetPatterns = listOf("DBI2", "DBI3", "DBI4", "DBI5", "DOX2", "DWR1")
-        
-        Log.d(TAG, "Starting job search with screen height: $screenHeight")
-        Log.d(TAG, "Thresholds - top: $topThreshold, bottom: $bottomThreshold")
-        
-        fun findClickableNodes(node: AccessibilityNodeInfo) {
+        //val targetPatterns = listOf("DBI2", "DBI3", "DBI4", "DBI5", "DOX2", "DWR1")
+        val targetPatterns = listOf(
+            "DBI2",
+            "CUK3",
+            "DBI3",
+            "DBI4",
+            "VAP4",
+            "DBI5",
+            "CU46",
+            "CU49",
+            "CC16",
+            "CU03",
+            "DWR1",
+            "DB84",
+            "DBI7",
+            "CU63",
+            "DOX2",
+            "CU74",
+            "DST1",
+            "CU30",
+            "DXB1"
+        )
+
+        fun findJobNodes(node: AccessibilityNodeInfo) {
             try {
                 // Skip navigation drawer nodes
                 if (isNavigationDrawer(node)) {
-                    Log.d(TAG, "Skipping navigation drawer node: ${node.className}")
                     return
                 }
 
-                // Log node details for debugging
-                val bounds = Rect()
-                node.getBoundsInScreen(bounds)
-                
-                Log.d(TAG, "Examining node: " +
-                    "text=${node.text}, " +
-                    "desc=${node.contentDescription}, " +
-                    "clickable=${node.isClickable}, " +
-                    "enabled=${node.isEnabled}, " +
-                    "visible=${node.isVisibleToUser}, " +
-                    "className=${node.className}, " +
-                    "bounds=$bounds")
-                
-                // Check if node is clickable and in the middle portion
-                if (node.isClickable) {
-                    if (bounds.top > topThreshold && bounds.bottom < bottomThreshold) {
-                        val nodeText = node.text?.toString() ?: ""
-                        val nodeDesc = node.contentDescription?.toString() ?: ""
-                        
-                        // Check if the node text contains any of the target patterns
-                        val containsTargetPattern = targetPatterns.any { pattern ->
-                            nodeText.contains(pattern, ignoreCase = true) || 
+                val nodeText = node.text?.toString() ?: ""
+                val nodeDesc = node.contentDescription?.toString() ?: ""
+
+                // Check if the node text contains any of the target patterns
+                val containsTargetPattern = targetPatterns.any { pattern ->
+                    nodeText.contains(pattern, ignoreCase = true) ||
                             nodeDesc.contains(pattern, ignoreCase = true)
+                }
+
+                if (containsTargetPattern) {
+                    // Find the first clickable parent
+                    var parent = node.parent
+                    while (parent != null) {
+                        val parentClassName = parent.className?.toString() ?: ""
+
+                        // Stop if we reach a ViewGroup
+                        if (parentClassName.contains("ViewGroup") || parentClassName.contains("Layout")) {
+                            if (parent.isClickable) {
+                                val bounds = Rect()
+                                parent.getBoundsInScreen(bounds)
+
+                                if (bounds.top > topThreshold && bounds.bottom < bottomThreshold) {
+                                    jobs.add(parent)
+                                }
+                            }
+                            break
                         }
-                        
-                        if (containsTargetPattern) {
-                            Log.d(TAG, "Found clickable node with target pattern: " +
-                                "text=$nodeText, " +
-                                "desc=$nodeDesc, " +
-                                "bounds=$bounds")
-                            jobs.add(node)
-                        }
-                    } else {
-                        Log.d(TAG, "Node outside middle portion: " +
-                            "top=${bounds.top}, bottom=${bounds.bottom}, " +
-                            "thresholds: top=$topThreshold, bottom=$bottomThreshold")
+                        parent = parent.parent
                     }
                 }
-                
+
                 // Recursively check children
                 for (i in 0 until node.childCount) {
-                    node.getChild(i)?.let { findClickableNodes(it) }
+                    node.getChild(i)?.let { findJobNodes(it) }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing node: ${e.message}")
             }
         }
-        
+
         try {
-            // Start the search
-            findClickableNodes(root)
-            Log.d(TAG, "Search complete. Found ${jobs.size} potential job nodes")
-            
+            findJobNodes(root)
+
             // Sort jobs by their vertical position (top to bottom)
             jobs.sortBy { node ->
                 val bounds = Rect()
                 node.getBoundsInScreen(bounds)
                 bounds.top
             }
-            
-            // Log details of all found nodes
-            jobs.forEachIndexed { index, job ->
-                val bounds = Rect()
-                job.getBoundsInScreen(bounds)
-                Log.d(TAG, "Job $index details: " +
-                    "text=${job.text}, " +
-                    "desc=${job.contentDescription}, " +
-                    "clickable=${job.isClickable}, " +
-                    "enabled=${job.isEnabled}, " +
-                    "visible=${job.isVisibleToUser}, " +
-                    "bounds=$bounds")
-            }
-            
+
             // Return the first job node (topmost) if any found
-            return if (jobs.isNotEmpty()) {
-                Log.d(TAG, "Selected first job node (index 0)")
-                jobs[0]
-            } else {
-                Log.d(TAG, "No job nodes found")
-                null
-            }
+            return jobs.firstOrNull()
         } catch (e: Exception) {
             Log.e(TAG, "Error finding job nodes: ${e.message}")
             return null
@@ -269,34 +333,37 @@ class OverlayAccessibilityService : AccessibilityService() {
             val displayMetrics = resources.displayMetrics
             val screenHeight = displayMetrics.heightPixels
             val bottomThreshold = screenHeight * 0.8 // Consider bottom 20% of screen
-            
+
             // Try different variations of the accept button text
-            val acceptTexts = listOf("Schedule", "SCHEDULE", "schedule")
+            val acceptTexts =
+                listOf("Schedule", "SCHEDULE", "schedule", "ACCEPT", "accept", "Accept")
             val acceptNodes = mutableListOf<AccessibilityNodeInfo>()
-            
+
             for (text in acceptTexts) {
                 root.findAccessibilityNodeInfosByText(text).forEach { node ->
                     // Skip navigation drawer nodes
                     if (!isNavigationDrawer(node)) {
                         acceptNodes.add(node)
                     } else {
-                        Log.d(TAG, "Skipping navigation drawer node for text: $text")
+                        Log.e(TAG, "Skipping navigation drawer node for text: $text")
                     }
                 }
             }
-            
-            Log.d(TAG, "Found ${acceptNodes.size} nodes with accept-like text")
-            
+
+            Log.e(TAG, "Found ${acceptNodes.size} nodes with accept-like text")
+
             return acceptNodes.firstOrNull { node ->
                 val bounds = Rect()
                 node.getBoundsInScreen(bounds)
-                Log.d(TAG, "Checking accept node: text=${node.text}, " +
-                    "desc=${node.contentDescription}, " +
-                    "clickable=${node.isClickable}, " +
-                    "enabled=${node.isEnabled}, " +
-                    "visible=${node.isVisibleToUser}, " +
-                    "bounds=$bounds")
-                
+                Log.e(
+                    TAG, "Checking accept node: text=${node.text}, " +
+                            "desc=${node.contentDescription}, " +
+                            "clickable=${node.isClickable}, " +
+                            "enabled=${node.isEnabled}, " +
+                            "visible=${node.isVisibleToUser}, " +
+                            "bounds=$bounds"
+                )
+
                 node.isClickable && bounds.bottom > bottomThreshold
             }
         } catch (e: Exception) {
@@ -306,40 +373,30 @@ class OverlayAccessibilityService : AccessibilityService() {
     }
 
     fun tryClickRefreshButton(): Boolean {
-        // Always perform pull-to-refresh gesture regardless of button status
-        Log.d(TAG, "Performing pull-to-refresh gesture")
-        performPullToRefresh()
-
         val rootNode = rootInActiveWindow ?: run {
-            Log.d(TAG, "rootInActiveWindow is null")
+            Log.e(TAG, "rootInActiveWindow is null")
             return false
         }
-        
+
         // Try to find and click the refresh button
         val button = findRefreshButton(rootNode)
         if (button != null) {
             val bounds = Rect()
             button.getBoundsInScreen(bounds)
-            Log.d(TAG, "Refresh button found: text=${button.text}, " +
-                "clickable=${button.isClickable}, " +
-                "enabled=${button.isEnabled}, " +
-                "visible=${button.isVisibleToUser}, " +
-                "bounds=$bounds")
-            
+            Log.e(TAG, "Refresh button found: bounds=$bounds")
+
             val actionResult = button.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            Log.d(TAG, "ACTION_CLICK result: $actionResult")
-            showToast("Clicked refresh button via accessibility service")
-            
+            Log.e(TAG, "ACTION_CLICK result: $actionResult")
+
             if (!actionResult) {
                 performClick(bounds.centerX(), bounds.centerY())
-                Log.d(TAG, "Falling back to gesture click at: $bounds")
+                Log.e(TAG, "Falling back to gesture click at: $bounds")
             }
         } else {
-            Log.d(TAG, "No refresh button found")
+            Log.e(TAG, "No refresh button found, trying pull-to-refresh")
+            performPullToRefresh()
         }
-        
-    
-        
+
         return true
     }
 
@@ -347,30 +404,36 @@ class OverlayAccessibilityService : AccessibilityService() {
         val displayMetrics = resources.displayMetrics
         val screenWidth = displayMetrics.widthPixels
         val screenHeight = displayMetrics.heightPixels
-        
+
         // Calculate start and end points for the gesture
         val startX = screenWidth / 2f
-        val startY = screenHeight * 0.3f  // Start at 30% from top
+        val startY = screenHeight * 0.31f  // Start at 30% from top
         val endY = screenHeight * 0.7f    // End at 70% from top
-        
-        Log.d(TAG, "Performing pull-to-refresh gesture: startY=$startY, endY=$endY")
-        
+
+        Log.e(TAG, "Performing pull-to-refresh gesture: startY=$startY, endY=$endY")
+
         // Create the path for the gesture
         val path = Path()
         path.moveTo(startX, startY)
         path.lineTo(startX, endY)
-        
+
         // Create and dispatch the gesture
         val gestureBuilder = GestureDescription.Builder()
-        gestureBuilder.addStroke(GestureDescription.StrokeDescription(path, 0, 500)) // 500ms duration
+        gestureBuilder.addStroke(
+            GestureDescription.StrokeDescription(
+                path,
+                0,
+                500
+            )
+        ) // 500ms duration
         dispatchGesture(gestureBuilder.build(), object : GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription) {
-                Log.d(TAG, "Pull-to-refresh gesture completed")
+                Log.e(TAG, "Pull-to-refresh gesture completed")
                 showToast("Pull-to-refresh gesture completed")
             }
-            
+
             override fun onCancelled(gestureDescription: GestureDescription) {
-                Log.d(TAG, "Pull-to-refresh gesture cancelled")
+                Log.e(TAG, "Pull-to-refresh gesture cancelled")
                 showToast("Pull-to-refresh gesture cancelled")
             }
         }, null)
@@ -381,34 +444,36 @@ class OverlayAccessibilityService : AccessibilityService() {
             val displayMetrics = resources.displayMetrics
 //            val screenHeight = displayMetrics.heightPixels
 //            val bottomThreshold = screenHeight * 0.6 // Consider bottom 20% of screen
-            
+
             // Try different variations of the refresh button text
             val refreshTexts = listOf("Refresh", "REFRESH", "refresh")
             val refreshNodes = mutableListOf<AccessibilityNodeInfo>()
-            
+
             for (text in refreshTexts) {
                 root.findAccessibilityNodeInfosByText(text).forEach { node ->
                     // Skip navigation drawer nodes
                     if (!isNavigationDrawer(node)) {
                         refreshNodes.add(node)
                     } else {
-                        Log.d(TAG, "Skipping navigation drawer node for text: $text")
+                        Log.e(TAG, "Skipping navigation drawer node for text: $text")
                     }
                 }
             }
-            
-            Log.d(TAG, "Found ${refreshNodes.size} nodes with refresh-like text")
-            
+
+            Log.e(TAG, "Found ${refreshNodes.size} nodes with refresh-like text")
+
             return refreshNodes.firstOrNull { node ->
                 val bounds = Rect()
                 node.getBoundsInScreen(bounds)
-                Log.d(TAG, "Checking refresh node: text=${node.text}, " +
-                    "desc=${node.contentDescription}, " +
-                    "clickable=${node.isClickable}, " +
-                    "enabled=${node.isEnabled}, " +
-                    "visible=${node.isVisibleToUser}, " +
-                    "bounds=$bounds")
-                
+                Log.e(
+                    TAG, "Checking refresh node: text=${node.text}, " +
+                            "desc=${node.contentDescription}, " +
+                            "clickable=${node.isClickable}, " +
+                            "enabled=${node.isEnabled}, " +
+                            "visible=${node.isVisibleToUser}, " +
+                            "bounds=$bounds"
+                )
+
                 node.isClickable //&& bounds.bottom > bottomThreshold
             }
         } catch (e: Exception) {
@@ -418,7 +483,7 @@ class OverlayAccessibilityService : AccessibilityService() {
     }
 
     fun performClick(x: Int, y: Int) {
-        Log.d(TAG, "Performing gesture click at: x=$x, y=$y")
+        Log.e(TAG, "Performing gesture click at: x=$x, y=$y")
         val path = Path()
         path.moveTo(x.toFloat(), y.toFloat())
         val gestureBuilder = GestureDescription.Builder()
@@ -428,10 +493,10 @@ class OverlayAccessibilityService : AccessibilityService() {
 
     private fun showToast(message: String) {
         // Use main thread for Toast
-        val handler = android.os.Handler(mainLooper)
-        handler.post {
-            Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
-        }
+//        val handler = android.os.Handler(mainLooper)
+//        handler.post {
+//            Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
+//        }
     }
 
     fun setServiceRunning(running: Boolean) {
@@ -439,19 +504,19 @@ class OverlayAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        Log.d(TAG, "Service interrupted")
+        Log.e(TAG, "Service interrupted")
         isServiceRunning = false
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Log.d(TAG, "Service connected")
+        Log.e(TAG, "Service connected")
         setInstance(this)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "Service destroyed")
+        Log.e(TAG, "Service destroyed")
         setInstance(null)
         isServiceRunning = false
     }

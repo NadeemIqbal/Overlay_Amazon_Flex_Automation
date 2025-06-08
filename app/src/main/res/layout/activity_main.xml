@@ -5,15 +5,15 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
     android:layout_marginTop="?actionBarSize"
+    android:padding="16dp"
     tools:context=".MainActivity">
 
     <TextView
         android:id="@+id/statusTitle"
         android:layout_width="wrap_content"
-        android:layout_marginTop="?actionBarSize"
         android:layout_height="wrap_content"
+        android:layout_marginTop="?actionBarSize"
         android:text="@string/status_title"
         android:textSize="24sp"
         android:textStyle="bold"
@@ -55,6 +55,7 @@
         android:text="@string/instructions_title"
         android:textSize="24sp"
         android:textStyle="bold"
+        android:visibility="gone"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/enableAccessibilityButton" />
 
@@ -64,8 +65,84 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:textSize="16sp"
+        android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/instructionsTitle" />
+
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/barrier"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="instructions,enableAccessibilityButton,overlayStatus" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="vertical"
+        android:paddingVertical="16dp"
+        app:layout_constraintTop_toBottomOf="@+id/barrier">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Height Percentage Settings"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/heightPercentageInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:hint="Enter height percentage (0-100)"
+                android:inputType="numberDecimal" />
+
+            <Button
+                android:id="@+id/saveHeightButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Save" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Width Percentage Settings"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/widthPercentageInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:hint="Enter width percentage (0-100)"
+                android:inputType="numberDecimal" />
+
+            <Button
+                android:id="@+id/saveWidthButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Save" />
+        </LinearLayout>
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

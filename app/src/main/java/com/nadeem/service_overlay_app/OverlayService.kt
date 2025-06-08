@@ -18,6 +18,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
 import androidx.core.app.NotificationCompat
+import kotlin.random.Random
 
 class OverlayService : Service() {
     private var windowManager: WindowManager? = null
@@ -32,37 +33,10 @@ class OverlayService : Service() {
             if (isRunning) {
                 val accessibilityService = OverlayAccessibilityService.getInstance()
                 if (accessibilityService != null) {
-                    when {
-                        // If we're in the middle of clicking a job, wait
-                        isClickingJob -> {
-                            handler.postDelayed(this, 500)
-                        }
-                        // If we're in the middle of clicking accept, wait
-                        isClickingAccept -> {
-                            handler.postDelayed(this, 500)
-                        }
-                        accessibilityService.hasRefreshButton() ->{
-                            accessibilityService.tryClickRefreshButton()
-                            handler.postDelayed(this, 500)
-                        }
-                        // If there are jobs, click the first one and then accept
-                        accessibilityService.hasJobsNow() -> {
-                            val jobClicked = accessibilityService.tryClickFirstJob()
-                            if (jobClicked) {
-                                // Wait a bit for the job details to load
-                                handler.postDelayed({
-                                    accessibilityService.tryClickAcceptButton()
-                                }, 100)
-                            }
-                            handler.postDelayed(this, 500)
-                        }
-                        // If no jobs, click refresh
-                        else -> {
-                            Log.e("TAG","Ignore")
-                            accessibilityService.tryClickRefreshButton()
-                            handler.postDelayed(this, 500)
-                        }
-                    }
+                    // Trigger the new workflow in OverlayAccessibilityService
+                    accessibilityService.handleJobFlow()
+                    // Schedule next check after a short delay
+                    handler.postDelayed(this, 500)
                 }
             }
         }
@@ -112,6 +86,13 @@ class OverlayService : Service() {
         params.x = 0
         params.y = 100
 
+        // Make the view draggable
+        var initialX: Int = 0
+        var initialY: Int = 0
+        var initialTouchX: Float = 0f
+        var initialTouchY: Float = 0f
+
+        // Set up the toggle button click listener first
         val toggleButton = floatingView?.findViewById<ImageButton>(R.id.toggleButton)
         toggleButton?.setOnClickListener {
             isRunning = !isRunning
@@ -125,34 +106,63 @@ class OverlayService : Service() {
             }
         }
 
-        // Make the view draggable
-        var initialX: Int = 0
-        var initialY: Int = 0
-        var initialTouchX: Float = 0f
-        var initialTouchY: Float = 0f
-
+        // Make the entire view draggable
         floatingView?.setOnTouchListener { view, event ->
+            Log.e("OverlayService", "Touch event: ${event.action}")
+            
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
+                    Log.e("OverlayService", "ACTION_DOWN")
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
+                    view.parent.requestDisallowInterceptTouchEvent(true)
                     true
                 }
 
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    windowManager?.updateViewLayout(view, params)
+                    Log.e("OverlayService", "ACTION_MOVE: x=${event.rawX}, y=${event.rawY}")
+                    val newX = initialX + (event.rawX - initialTouchX).toInt()
+                    val newY = initialY + (event.rawY - initialTouchY).toInt()
+                    params.x = newX
+                    params.y = newY
+                    try {
+                        windowManager?.updateViewLayout(view, params)
+                    } catch (e: Exception) {
+                        Log.e("OverlayService", "Error updating layout: ${e.message}")
+                    }
                     true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    Log.e("OverlayService", "ACTION_UP")
+                    view.parent.requestDisallowInterceptTouchEvent(false)
+                    // Get screen width
+                    val displayMetrics = resources.displayMetrics
+                    val screenWidth = displayMetrics.widthPixels
+                    
+                    // Snap to nearest edge
+                    params.x = if (params.x < screenWidth / 2) 0 else screenWidth - view.width
+                    try {
+                        windowManager?.updateViewLayout(view, params)
+                    } catch (e: Exception) {
+                        Log.e("OverlayService", "Error updating layout: ${e.message}")
+                    }
+                    false
                 }
 
                 else -> false
             }
         }
 
-        windowManager?.addView(floatingView, params)
+        // Add the view to window manager
+        try {
+            windowManager?.addView(floatingView, params)
+            Log.e("OverlayService", "View added to window manager")
+        } catch (e: Exception) {
+            Log.e("OverlayService", "Error adding view: ${e.message}")
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
