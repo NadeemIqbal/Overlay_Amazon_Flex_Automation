@@ -69,7 +69,7 @@ class OverlayAccessibilityService : AccessibilityService() {
 
         // Check for "No Offers" text in the screen
         if (hasNoOffersText(rootNode)) {
-            Log.e(TAG, "Found 'No Offers' text, performing pull to refresh")
+            Log.e(TAG, "Found 'No Offers' text or 'don't have offers', performing pull to refresh")
             performPullToRefresh()
             return
         }
@@ -79,8 +79,8 @@ class OverlayAccessibilityService : AccessibilityService() {
         val screenWidth = displayMetrics.widthPixels
         val screenHeight = displayMetrics.heightPixels
 
-        val clickX = screenWidth / 2
-        val clickY = (screenHeight * 0.3).toInt()
+        val clickX = (screenWidth * 0.5).toInt() // 0.6 is better
+        val clickY = (screenHeight * 0.37).toInt()
 
         Log.e(TAG, "Clicking at coordinates: x=$clickX, y=$clickY")
         performClick(clickX, clickY)
@@ -90,8 +90,10 @@ class OverlayAccessibilityService : AccessibilityService() {
         android.os.Handler(mainLooper).postDelayed({
             isWaitingForJobClick = false
             // Click at custom width percentage and custom height percentage
-            val widthPercentage = MainActivity.getWidthPercentage(applicationContext) / 100f
-            val heightPercentage = MainActivity.getHeightPercentage(applicationContext) / 100f
+          //  val widthPercentage = MainActivity.getWidthPercentage(applicationContext) / 100f
+            // val heightPercentage = MainActivity.getHeightPercentage(applicationContext) / 100f
+            val widthPercentage = (screenWidth * 0.80).toInt()
+            val heightPercentage = (screenHeight * 0.96).toInt()
             val bottomRightX = (screenWidth * widthPercentage).toInt()
             val bottomRightY = (screenHeight * heightPercentage).toInt()
             Log.e(
@@ -103,7 +105,7 @@ class OverlayAccessibilityService : AccessibilityService() {
     }
 
     private fun hasNoOffersText(root: AccessibilityNodeInfo): Boolean {
-        val noOffersTexts = listOf("No Offers", "NO OFFERS", "no offers")
+        val noOffersTexts = listOf("No offers", "don't have any offers", "0 Offers")
         return noOffersTexts.any { text ->
             root.findAccessibilityNodeInfosByText(text).isNotEmpty()
         }
