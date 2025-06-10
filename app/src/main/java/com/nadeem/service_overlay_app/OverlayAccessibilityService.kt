@@ -69,7 +69,7 @@ class OverlayAccessibilityService : AccessibilityService() {
 
         // Check for "No Offers" text in the screen
         if (hasNoOffersText(rootNode)) {
-            Log.e(TAG, "Found 'No Offers' text or 'don't have offers', performing pull to refresh")
+            Log.e(TAG, "Found 'No Offers' text or 'don't have any offers', performing pull to refresh")
             performPullToRefresh()
             return
         }
