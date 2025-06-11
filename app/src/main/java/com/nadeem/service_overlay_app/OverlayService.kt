@@ -4,12 +4,14 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -27,6 +29,8 @@ class OverlayService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var isClickingJob = false
     private var isClickingAccept = false
+
+
 
     private val refreshRunnable = object : Runnable {
         override fun run() {
@@ -105,6 +109,15 @@ class OverlayService : Service() {
                 handler.post(refreshRunnable)
             }
         }
+
+
+        // wakeLock
+        val wakeLock: PowerManager.WakeLock =
+            (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
+                newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "OverlayService::MyWakelockTag").apply {
+                    acquire()
+                }
+            }
 
         // Make the entire view draggable
         floatingView?.setOnTouchListener { view, event ->

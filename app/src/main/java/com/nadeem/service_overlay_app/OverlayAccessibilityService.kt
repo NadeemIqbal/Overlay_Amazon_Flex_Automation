@@ -2,11 +2,16 @@ package com.nadeem.service_overlay_app
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.util.Log
+import android.view.View
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.FrameLayout
 import android.widget.Toast
 
 class OverlayAccessibilityService : AccessibilityService() {
@@ -69,23 +74,35 @@ class OverlayAccessibilityService : AccessibilityService() {
 
         // Check for "No Offers" text in the screen
         if (hasNoOffersText(rootNode)) {
-            Log.e(TAG, "Found 'No Offers' text or 'don't have any offers', performing pull to refresh")
+            Log.e(TAG, "Found 'No Offers' and similar text which means it is on the offers screen")
             performPullToRefresh()
             return
         }
+
 
         // If no "No Offers" text found, click at width/2 and 30% height
         val displayMetrics = resources.displayMetrics
         val screenWidth = displayMetrics.widthPixels
         val screenHeight = displayMetrics.heightPixels
 
-        val clickX = (screenWidth * 0.5).toInt() // 0.6 is better
+        val clickX = (screenWidth * 0.6).toInt() // 0.6 is better
         val clickY = (screenHeight * 0.37).toInt()
-
         Log.e(TAG, "Clicking at coordinates: x=$clickX, y=$clickY")
         performClick(clickX, clickY)
 
-        // Wait 1 second before clicking at bottom right
+
+        // Check for "Schedule Button" // written by F
+        if (hasScheduleText(rootNode)) {
+            Log.e(TAG, "Found 'Schedule' and click")
+            val bottomRightX = (screenWidth * 0.80).toInt()
+            val bottomRightY = (screenHeight * 0.97).toInt()
+
+            performClick(bottomRightX,bottomRightY)
+            Log.e(TAG, "Schedule click: $bottomRightX, y=$bottomRightY)")
+            return
+        }
+
+      /*  // Wait 1 second before clicking at bottom right
         isWaitingForJobClick = true
         android.os.Handler(mainLooper).postDelayed({
             isWaitingForJobClick = false
@@ -93,7 +110,7 @@ class OverlayAccessibilityService : AccessibilityService() {
           //  val widthPercentage = MainActivity.getWidthPercentage(applicationContext) / 100f
             // val heightPercentage = MainActivity.getHeightPercentage(applicationContext) / 100f
             val widthPercentage = (screenWidth * 0.80).toInt()
-            val heightPercentage = (screenHeight * 0.96).toInt()
+            val heightPercentage = (screenHeight * 0.97).toInt()
             val bottomRightX = (screenWidth * widthPercentage).toInt()
             val bottomRightY = (screenHeight * heightPercentage).toInt()
             Log.e(
@@ -101,14 +118,45 @@ class OverlayAccessibilityService : AccessibilityService() {
                 "Clicking at bottom right coordinates: x=$bottomRightX, y=$bottomRightY (${widthPercentage * 100}% width, ${heightPercentage * 100}% height)"
             )
             performClick(bottomRightX, bottomRightY)
-        }, 1000)
+        }, 600) */
     }
 
+
+
+
     private fun hasNoOffersText(root: AccessibilityNodeInfo): Boolean {
-        val noOffersTexts = listOf("No offers", "don't have any offers", "0 Offers")
-        return noOffersTexts.any { text ->
+        val noOffersTexts = listOf("No offers", "don't have any offers", "0 Offers", "0 of ")
+        val hasAnyNoOfferTexts= noOffersTexts.any { text ->
             root.findAccessibilityNodeInfosByText(text).isNotEmpty()
         }
+        val offerScreenTexts = listOf("Filter", "Refresh")
+        val hasAllOfferScreenTexts = offerScreenTexts.all { text ->
+            root.findAccessibilityNodeInfosByText(text).isNotEmpty()
+        }
+
+        val textTooManyTimes = listOf("too many times", "try again", "too long")
+        val excludeTextTooManyTimes = textTooManyTimes.none { text ->
+            root.findAccessibilityNodeInfosByText(text).isNotEmpty()
+        }
+
+        return hasAnyNoOfferTexts && hasAllOfferScreenTexts && excludeTextTooManyTimes
+    }
+
+    private fun hasScheduleText(root: AccessibilityNodeInfo): Boolean {
+        val scheduleTexts = listOf("Schedule","SCHEDULE","schedule")
+        val hasScheduleTexts = scheduleTexts.any { text ->
+            root.findAccessibilityNodeInfosByText(text).isNotEmpty()
+        }
+        val noOffersTexts = listOf("No offers", "don't have any offers", "0 Offers", "0 of ")
+        val excludeNoOfferTexts= noOffersTexts.none { text ->
+            root.findAccessibilityNodeInfosByText(text).isNotEmpty()
+        }
+
+        val offerScreenTexts = listOf("Filter", "Refresh")
+        val excludeAllOfferScreenTexts = offerScreenTexts.none { requiredText ->
+            root.findAccessibilityNodeInfosByText(requiredText).isNotEmpty()
+        }
+        return hasScheduleTexts && excludeNoOfferTexts && excludeAllOfferScreenTexts
     }
 
     private fun clickScheduleButton() {
@@ -142,6 +190,7 @@ class OverlayAccessibilityService : AccessibilityService() {
             if (!actionResult) {
                 performClick(bounds.centerX(), bounds.centerY())
             }
+
         }
     }
 
@@ -338,7 +387,7 @@ class OverlayAccessibilityService : AccessibilityService() {
 
             // Try different variations of the accept button text
             val acceptTexts =
-                listOf("Schedule", "SCHEDULE", "schedule", "ACCEPT", "accept", "Accept")
+                listOf("Schedule", "SCHEDULE", "schedule")
             val acceptNodes = mutableListOf<AccessibilityNodeInfo>()
 
             for (text in acceptTexts) {
@@ -425,7 +474,7 @@ class OverlayAccessibilityService : AccessibilityService() {
             GestureDescription.StrokeDescription(
                 path,
                 0,
-                500
+                350 // 400 is natural human and 200+ is fast and <200 is sometimes unrecognised
             )
         ) // 500ms duration
         dispatchGesture(gestureBuilder.build(), object : GestureResultCallback() {
