@@ -67,10 +67,14 @@ class OverlayAccessibilityService : AccessibilityService() {
     public fun handleJobFlow() {
         val rootNode = rootInActiveWindow ?: return
 
+        val displayMetrics = resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
         // If we're waiting for job click delay, don't do anything
-        if (isWaitingForJobClick) {
+       /* if (isWaitingForJobClick) {
             return
-        }
+        }*/
 
         // Check for "No Offers" text in the screen
         if (hasNoOffersText(rootNode)) {
@@ -79,17 +83,15 @@ class OverlayAccessibilityService : AccessibilityService() {
             return
         }
 
+    if(hasAtleastOneJob(rootNode)) {
+    // If no "No Offers" text found, click at width/2 and 30% height
+    val clickX = (screenWidth * 0.6).toInt() // 0.6 is better
+    val clickY = (screenHeight * 0.37).toInt()
+    Log.e(TAG, "Clicking at coordinates: x=$clickX, y=$clickY")
+    performClick(clickX, clickY)
+    return
 
-        // If no "No Offers" text found, click at width/2 and 30% height
-        val displayMetrics = resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels
-        val screenHeight = displayMetrics.heightPixels
-
-        val clickX = (screenWidth * 0.6).toInt() // 0.6 is better
-        val clickY = (screenHeight * 0.37).toInt()
-        Log.e(TAG, "Clicking at coordinates: x=$clickX, y=$clickY")
-        performClick(clickX, clickY)
-
+    }
 
         // Check for "Schedule Button" // written by F
         if (hasScheduleText(rootNode)) {
@@ -140,6 +142,21 @@ class OverlayAccessibilityService : AccessibilityService() {
         }
 
         return hasAnyNoOfferTexts && hasAllOfferScreenTexts && excludeTextTooManyTimes
+    }
+
+    private fun hasAtleastOneJob(root: AccessibilityNodeInfo): Boolean {
+
+        val offerScreenTexts = listOf("Filter", "Refresh")
+        val hasAllOfferScreenTexts = offerScreenTexts.all { text ->
+            root.findAccessibilityNodeInfosByText(text).isNotEmpty()
+        }
+
+        val noOffersTexts = listOf("No offers", "don't have any offers", "0 Offers", "0 of ")
+        val hasAnyNoOfferTexts= noOffersTexts.none { text ->
+            root.findAccessibilityNodeInfosByText(text).isNotEmpty()
+        }
+
+        return hasAnyNoOfferTexts && hasAllOfferScreenTexts
     }
 
     private fun hasScheduleText(root: AccessibilityNodeInfo): Boolean {
